@@ -1,0 +1,10 @@
+C:\work\makves\src\makves-file-compliance-win\bin\Debug\compliance.dll
+C:\work\makves\src\makves-file-compliance-win\bin\Debug\compliance.pdb
+C:\work\makves\src\makves-file-compliance-win\bin\Debug\Newtonsoft.Json.dll
+C:\work\makves\src\makves-file-compliance-win\bin\Debug\System.Management.Automation.dll
+C:\work\makves\src\makves-file-compliance-win\bin\Debug\Newtonsoft.Json.xml
+C:\work\makves\src\makves-file-compliance-win\obj\Debug\makves-file-compliance-win.csprojAssemblyReference.cache
+C:\work\makves\src\makves-file-compliance-win\obj\Debug\makves-file-compliance-win.csproj.CoreCompileInputs.cache
+C:\work\makves\src\makves-file-compliance-win\obj\Debug\makves-file-compliance-win.csproj.CopyComplete
+C:\work\makves\src\makves-file-compliance-win\obj\Debug\compliance.dll
+C:\work\makves\src\makves-file-compliance-win\obj\Debug\compliance.pdb
