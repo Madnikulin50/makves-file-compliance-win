@@ -1,6 +1,7 @@
 using System;
 using System.Text;
 using System.Runtime.InteropServices;
+using System.Runtime.InteropServices.ComTypes;
 
 //Contains IFilter interface translation
 //Most translations are from PInvoke.net
@@ -431,5 +432,30 @@ namespace compliance
       ref Guid riid, ref object ppunk);
   }
 
+    [ComImport, ComVisible(true)]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [Guid("0000010c-0000-0000-C000-000000000046")]
+    public interface IPersist
+    {
+        [PreserveSig]
+        [return: MarshalAs(UnmanagedType.Error)]
+        uint GetClassID(out Guid pClassID);
+    };
+
+    [ComImport, ComVisible(true)]
+    [InterfaceType(ComInterfaceType.InterfaceIsIUnknown)]
+    [Guid("00000109-0000-0000-C000-000000000046")]
+    public interface IPersistStream : IPersist
+    {
+        [PreserveSig]
+        [return: MarshalAs(UnmanagedType.Error)]
+        int IsDirty();
+
+        void Load([In] IStream pStm);
+
+        void Save([In] IStream pStm, [In, MarshalAs(UnmanagedType.Bool)] bool fClearDirty);
+
+        void GetSizeMax(out long pcbSize);
+    };
 
 }

@@ -5,8 +5,8 @@ using System.Runtime.InteropServices;
 // Общие сведения об этой сборке предоставляются следующим набором
 // набора атрибутов. Измените значения этих атрибутов для изменения сведений,
 // связанные со сборкой.
-[assembly: AssemblyTitle("compliance")]
-[assembly: AssemblyDescription("")]
+[assembly: AssemblyTitle("Makves Powershell Tools")]
+[assembly: AssemblyDescription("Makves Powershell Tools")]
 [assembly: AssemblyConfiguration("")]
 [assembly: AssemblyCompany("")]
 [assembly: AssemblyProduct("compliance")]

@@ -15,8 +15,8 @@ namespace compliance
         [JsonProperty("mask")]
         public string Mask { get; set; }
 
-        [JsonProperty("width")]
-        public int Width { get; set; }
+        [JsonProperty("weight")]
+        public int Weight { get; set; }
 
         [JsonProperty("descr")]
         public string Descr { get; set; }

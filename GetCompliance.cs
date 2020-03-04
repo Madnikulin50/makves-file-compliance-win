@@ -7,22 +7,92 @@ using Newtonsoft.Json;
 using System.Management.Automation;
 using System.Text.RegularExpressions;
 using compliance;
+using System.IO;
 
 namespace compliance
 {
+  
+    [Cmdlet(VerbsCommon.Get, "DocumentText")]
+    [OutputType(typeof(String))]
+    public class GetDocumentText : PSCmdlet
+    {
+        private string[] filesCollection;
+        [Parameter(Mandatory = true, ValueFromPipelineByPropertyName = true, ValueFromPipeline = true, Position = 0, HelpMessage = "Texts for analysis")]
+        public string[] File
+        {
+            get
+            {
+                return filesCollection;
+            }
+
+            set
+            {
+                filesCollection = value;
+            }
+        }
+
+        protected String getText(string filename)
+        {
+
+            string text = "";
+            try
+            {
+                try
+                {
+                    FilterReader reader = new FilterReader(filename);
+                    using (reader)
+                    {
+                        text = reader.ReadToEnd();
+                    }
+                    if (text == null || text.Length == 0)
+                    {
+                        TikaReader r = new TikaReader();
+                        text = r.getText(filename);
+                    }
+                }
+                catch
+                {
+                    TikaReader r = new TikaReader();
+                    text = r.getText(filename);
+                }
+            }
+            catch
+            {
+            }
+            return text;
+        }
+
+        protected override void BeginProcessing()
+        {
+            base.BeginProcessing();
+        }
+
+        protected override void ProcessRecord()
+        {
+            foreach (string file in filesCollection)
+            {
+                string text = getText(file);
+                WriteObject(text);
+            }
+        }
+    }
+
     public class Match
     {
         public string Name { get; set; }
         public string Source { get; set; }
-        public float Width { get; set; }
+        public float Weight { get; set; }
         public string Template { get; set; }
+        public string Mask { get; set; }
     }
 
     [Cmdlet(VerbsCommon.Get, "Compliance")]
     [OutputType(typeof(Match))]
     public class GetCompliance: PSCmdlet
     {
-        private string[] textCollection;
+        private string[] textCollection = new string[0];
+        private string[] fileCollection = new string[0];
+        private string[] kbCollection = new string[0];
 
         [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ValueFromPipeline = true, Position = 0, HelpMessage = "Texts for analysis")]
         public string[] Text
@@ -43,12 +113,26 @@ namespace compliance
         {
             get
             {
-                return textCollection;
+                return fileCollection;
             }
 
             set
             {
-                textCollection = value;
+                fileCollection = value;
+            }
+        }
+
+        [Parameter(Mandatory = false, ValueFromPipelineByPropertyName = true, ValueFromPipeline = true, Position = 2, HelpMessage = "Knowladge base for analysis")]
+        public string[] KB
+        {
+            get
+            {
+                return kbCollection;
+            }
+
+            set
+            {
+                kbCollection = value;
             }
         }
 
@@ -57,7 +141,54 @@ namespace compliance
         protected override void BeginProcessing()
         {
             Standarts = JsonConvert.DeserializeObject<IList<Standart>>(Data.Storage);
+            foreach (string k in KB)
+            {
+                try
+                {
+                    string s = System.IO.File.ReadAllText(k, Encoding.UTF8);
+                    IList<Standart> l = JsonConvert.DeserializeObject<IList<Standart>>(s);
+                    foreach (var cur in l)
+                    {
+                        Standarts.Add(cur);
+                    }
+                }
+                catch {
+                }
+                
+            }
             base.BeginProcessing();
+        }
+
+        protected String getText(string filename) {
+            
+            string text = "";
+            try
+            {
+                try
+                {
+                    FilterReader reader = new FilterReader(filename);
+                    using (reader)
+                    {
+                        text = reader.ReadToEnd();
+                    }
+                    if (text == null || text.Length == 0)
+                    {
+                        TikaReader r = new TikaReader();
+                        text = r.getText(filename);
+                    }
+                }
+                catch
+                {
+                    TikaReader r = new TikaReader();
+                    text = r.getText(filename);
+                }
+
+                text = text.ToLower();
+            }
+            catch
+            {
+            }
+            return text;
         }
 
         protected override void ProcessRecord()
@@ -77,8 +208,9 @@ namespace compliance
                                     Name = cur.Name,
                                     Source = text,
                                     Template = tcur.Descr,
-                                    Width = tcur.Width
-                                }); ;
+                                    Weight = tcur.Weight,
+                                    Mask = tcur.Mask
+                                });
                             }
                         } else if (tcur.Type == "regexp")
                         {
@@ -94,7 +226,8 @@ namespace compliance
                                         Name = cur.Name,
                                         Source = text,
                                         Template = tcur.Descr,
-                                        Width = tcur.Width
+                                        Weight = tcur.Weight,
+                                        Mask = tcur.Mask
                                     });
                                 }
                             } catch
@@ -110,11 +243,31 @@ namespace compliance
             foreach (string file in File)
             {
                 string text = "";
-                FilterReader reader = new FilterReader(file);
-                using (reader)
+                string ext = Path.GetExtension(file);
+                switch (ext)
                 {
-                    text = reader.ReadToEnd();
+                    case ".doc":
+                    case ".docx":
+                    case ".xls":
+                    case ".xlsx":
+                    case ".pdf":
+                    case ".txt":
+                    case ".rtf":
+                    case ".log":
+                        {
+                            text = getText(file);
+                            break;
+                        }
+      
+
                 }
+                if (text == null || text.Length == 0)
+                {
+                   
+                    continue;
+                }
+              
+            
                 string lower = text.ToLower();
 
                 foreach (Standart cur in Standarts)
@@ -125,15 +278,37 @@ namespace compliance
 
                         if (tcur.Type == "string")
                         {
-                            if (lower.Contains(tcur.Mask))
+                            /*if (lower.Contains(tcur.Mask))
                             {
                                 WriteObject(new Match
                                 {
                                     Name = cur.Name,
                                     Source = file,
                                     Template = tcur.Descr,
-                                    Width = tcur.Width
+                                    Weight = tcur.Weight,
+                                    Mask = tcur.Mask
                                 });
+                            }*/
+                            try
+                            {
+                                Regex rx = new Regex("\b" + tcur.Mask, RegexOptions.Compiled | RegexOptions.IgnoreCase);
+                                MatchCollection matches = rx.Matches(text);
+
+                                if (matches.Count > 0)
+                                {
+                                    WriteObject(new Match
+                                    {
+                                        Name = cur.Name,
+                                        Source = file,
+                                        Template = tcur.Descr,
+                                        Weight = tcur.Weight,
+                                        Mask = tcur.Mask
+                                    });
+                                }
+                            }
+                            catch
+                            {
+
                             }
                         }
                         else if (tcur.Type == "regexp")
@@ -150,7 +325,8 @@ namespace compliance
                                         Name = cur.Name,
                                         Source = file,
                                         Template = tcur.Descr,
-                                        Width = tcur.Width
+                                        Weight = tcur.Weight,
+                                        Mask = tcur.Mask
                                     });
                                 }
                             }
@@ -165,4 +341,6 @@ namespace compliance
             }
         }
     }
+
+    
 }

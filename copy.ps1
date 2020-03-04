@@ -1,0 +1,1 @@
+Copy-Item "C:\work\makves\src\makves-file-compliance-win\bin\Release\compliance.dll" -Destination "C:\work\makves\makves-powershell\DCAP\MakvesCompliance"

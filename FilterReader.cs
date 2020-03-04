@@ -103,9 +103,10 @@ namespace compliance
 
     public FilterReader(string fileName)
     {
-      _filter=FilterLoader.LoadAndInitIFilter(fileName);
+      string error = "";
+      _filter =FilterLoader.LoadAndInitIFilter(fileName, out error);
       if (_filter==null)
-        throw new ArgumentException("no filter defined for "+fileName);
+        throw new ArgumentException(error.Length > 0 ? error : "no filter defined for " + fileName);
     }
   }
 }

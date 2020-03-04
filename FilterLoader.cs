@@ -55,12 +55,12 @@ namespace compliance
     /// </summary>
     /// <param name="ext">The extension of the file</param>
     /// <returns>an IFilter instance used to retreive text from that file type</returns>
-    private static IFilter LoadIFilter(string ext)
+    private static IFilter LoadIFilter(string ext, out string error)
     {
       string dllName, filterPersistClass;
 
       //Find the dll and ClassID
-      if (GetFilterDllAndClass(ext, out dllName, out filterPersistClass))
+      if (GetFilterDllAndClass(ext, out dllName, out filterPersistClass, out error))
       {
         //load the dll and return an IFilter instance.
         return LoadFilterFromDll(dllName, filterPersistClass);
@@ -68,21 +68,42 @@ namespace compliance
       return null;
     }
 
-    internal static IFilter LoadAndInitIFilter(string fileName)
+    internal static IFilter LoadAndInitIFilter(string fileName, out string error)
     {
-      return LoadAndInitIFilter(fileName,Path.GetExtension(fileName));
+      return LoadAndInitIFilter(fileName,Path.GetExtension(fileName), out error);
     }
 
-    internal static IFilter LoadAndInitIFilter(string fileName, string extension)
+    internal static IFilter LoadAndInitIFilter(string fileName, string extension, out string error)
     {
-      IFilter filter=LoadIFilter(extension);
-      if (filter==null)
-        return null;
+            error = "";
+      IFilter filter=LoadIFilter(extension, out error);
+            if (filter == null) {
+               
+                error = "Error LoadIFilter:" + error;
+                return null;
+            }
 
       IPersistFile persistFile=(filter as IPersistFile);
-      if (persistFile!=null)
+            bool loaded = false;
+            if (persistFile != null)
+            {
+                persistFile.Load(fileName, 0);
+                loaded = true;
+            } else
+            {
+                IPersistStream persistStream = (filter as IPersistStream);
+                if (persistStream != null)
+                {
+                    persistStream.Load(File.OpenRead(fileName) as IStream);
+                    loaded = true;
+                } else
+                {
+                    error = "Error no IPersistFile and IPersistStream";
+                }
+            }
+      if (loaded)
       {
-        persistFile.Load(fileName, 0);
+               
         IFILTER_FLAGS flags;
         IFILTER_INIT iflags =
 					IFILTER_INIT.CANON_HYPHENS |
@@ -94,10 +115,17 @@ namespace compliance
 
         if (filter.Init(iflags, 0, IntPtr.Zero, out flags)==IFilterReturnCode.S_OK)
           return filter;
-      }
-      //If we failed to retreive an IPersistFile interface or to initialize 
-      //the filter, we release it and return null.
-      Marshal.ReleaseComObject(filter);
+         error = "Error filter.Init";
+       } else
+            {
+                if (error.Length == 0)
+                 error = "Error not loaded";
+            }
+          
+                
+            //If we failed to retreive an IPersistFile interface or to initialize 
+            //the filter, we release it and return null.
+            Marshal.ReleaseComObject(filter);
       return null;
     }
 
@@ -115,9 +143,10 @@ namespace compliance
       return (obj as IFilter);
     }
 
-    private static bool GetFilterDllAndClass(string ext, out string dllName, out string filterPersistClass)
+    private static bool GetFilterDllAndClass(string ext, out string dllName, out string filterPersistClass, out string error)
     {
-      if (!GetFilterDllAndClassFromCache(ext, out dllName, out filterPersistClass))
+      error = "";
+      if (!GetFilterDllAndClassFromCache(ext, out dllName, out filterPersistClass, out error))
       {
         string persistentHandlerClass;
 
@@ -125,8 +154,11 @@ namespace compliance
         if (persistentHandlerClass!=null)
         {
           GetFilterDllAndClassFromPersistentHandler(persistentHandlerClass,
-            out dllName, out filterPersistClass);
-        }
+            out dllName, out filterPersistClass, out error);
+        } else
+                {
+                    error = "No registrated ifilter handler for " + ext;
+                }
         AddExtensionToCache(ext, dllName, filterPersistClass);
       }
       return (dllName!=null && filterPersistClass!=null); 
@@ -140,21 +172,30 @@ namespace compliance
       }
     }
 
-    private static bool GetFilterDllAndClassFromPersistentHandler(string persistentHandlerClass, out string dllName, out string filterPersistClass)
+    private static bool GetFilterDllAndClassFromPersistentHandler(string persistentHandlerClass, out string dllName, out string filterPersistClass, out string error)
     {
       dllName=null;
       filterPersistClass=null;
-
-      //Read the CLASS ID of the IFilter persistent handler
-      filterPersistClass=ReadStrFromHKLM(@"Software\Classes\CLSID\" + persistentHandlerClass + 
+            error = "";
+              //Read the CLASS ID of the IFilter persistent handler
+              filterPersistClass =ReadStrFromHKLM(@"Software\Classes\CLSID\" + persistentHandlerClass + 
         @"\PersistentAddinsRegistered\{89BCB740-6119-101A-BCB7-00DD010655AF}");
-      if (String.IsNullOrEmpty(filterPersistClass))
-          return false;
+            if (String.IsNullOrEmpty(filterPersistClass))
+            {
+                error = @"error read from Software\Classes\CLSID\" + persistentHandlerClass +
+        @"\PersistentAddinsRegistered\{89BCB740-6119-101A-BCB7-00DD010655AF}";
+                return false;
+            }
 
       //Read the dll name 
       dllName=ReadStrFromHKLM(@"Software\Classes\CLSID\" + filterPersistClass + 
         @"\InprocServer32");
-      return (!String.IsNullOrEmpty(dllName));
+            if (String.IsNullOrEmpty(dllName))
+            {
+                error = @"error read from Software\Classes\CLSID\" + filterPersistClass + 
+        @"\InprocServer32";
+            }
+      return !String.IsNullOrEmpty(dllName);
     }
 
     private static string GetPersistentHandlerClass(string ext, bool searchContentType)
@@ -194,8 +235,8 @@ namespace compliance
       
       //Get the Class ID for this document type
       string docClass=ReadStrFromHKLM(@"Software\Classes\" + docType + @"\CLSID");
-      if (String.IsNullOrEmpty(docType))
-        return null;
+            if (String.IsNullOrEmpty(docType))
+                return null;// ReadStrFromHKLM(@"Software\Classes\CLSID\" + ext + @"\PersistentHandler"); ;
 
       //Now get the PersistentHandler for that Class ID
       return ReadStrFromHKLM(@"Software\Classes\CLSID\" + docClass + @"\PersistentHandler");
@@ -206,8 +247,9 @@ namespace compliance
       return ReadStrFromHKLM(@"Software\Classes\"+ext+@"\PersistentHandler");
     }
 
-    private static bool GetFilterDllAndClassFromCache(string ext, out string dllName, out string filterPersistClass)
+    private static bool GetFilterDllAndClassFromCache(string ext, out string dllName, out string filterPersistClass, out string error)
     {
+            error = "";
       string lowerExt=ext.ToLower();
       lock (_cache)
       {
@@ -216,10 +258,12 @@ namespace compliance
         {
           dllName=cacheEntry.DllName;
           filterPersistClass=cacheEntry.ClassName;
+            
           return true;
         }
       }
-      dllName=null;
+            error = "not found and cache";
+      dllName =null;
       filterPersistClass=null;
       return false;
     }
